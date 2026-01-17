@@ -17,7 +17,8 @@ import {
   Code,
   Terminal,
   Server,
-  Cpu
+  Cpu,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -44,7 +45,7 @@ const REVENUE_DATA = [
 ];
 
 export default function App() {
-  const [activeTrack, setActiveTrack] = useState<TrackData>(INITIAL_DATA[2]); // Default to Crypto for this request
+  const [activeTrack, setActiveTrack] = useState<TrackData>(INITIAL_DATA[2]); // Default to Crypto
   const [analysis, setAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [userQuery, setUserQuery] = useState('');
@@ -53,19 +54,30 @@ export default function App() {
   const generateStrategicAdvice = useCallback(async (query?: string) => {
     setIsAnalyzing(true);
     try {
+      // Initialize GoogleGenAI with API key from environment variables
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const blueprintPrompt = `
-        ACT AS: Principal Post-Quantum Security Architect.
-        OBJECTIVE: Provide the technical implementation blueprint for 'Hybrid Off-Chain Proving with Rust-SNOVA Batching'.
+        ACT AS: Principal Post-Quantum Security Architect for AuditorSEC.
+        OBJECTIVE: Provide a detailed technical implementation blueprint for 'Hybrid Off-Chain Proving with Rust-SNOVA Batching'.
         
-        TRACK CONTEXT: ${activeTrack.type} (Progress: ${activeTrack.progress}%).
+        SNOVA CRATE SPECIFICATION:
+        1. Describe a conceptual 'snova-pq' Rust crate designed for high-throughput batching.
+        2. Include imports like 'snova_pq::{KeyPair, Batcher, Signature, Verifier}'.
+        3. Provide a detailed Rust example showing:
+           - Initializing a Batcher with specific security parameters (e.g., NIST level 1 or 3).
+           - Collecting multiple transaction payloads into a batch.
+           - Generating a single batched signature over N messages using multivariate quadratic cryptography.
+           - A verification example showing the batched proof being checked by an aggregator.
+        4. Include clear function signatures for:
+           - fn generate_batch_proof(messages: &[Vec<u8>], key: &SecretKey) -> Result<BatchedSignature, SnovaError>
+           - fn verify_batch_proof(proof: &BatchedSignature, messages: &[Vec<u8>], key: &PublicKey) -> bool
         
-        REQUIREMENTS:
-        1. Provide a Rust code snippet using a conceptual 'snova' crate showing batch signature generation.
-        2. Provide a Docker Compose or Kubernetes YAML snippet for deploying the Proving Node.
-        3. Explain the integration with a Solidity registry for on-chain verification.
-        4. Format as technical documentation with markdown code blocks.
+        DEPLOYMENT & INTEGRATION:
+        5. Provide a Docker Compose configuration for the proving node (Rust-based).
+        6. Explain the Solidity side: How a 'verifyBatchedSnova' function in an AuditorSEC Smart Contract would receive the off-chain proof and update the audit trail registry.
+        
+        Format as professional technical documentation with syntax-highlighted markdown code blocks. Be concise but extremely technical.
       `;
 
       const standardPrompt = `
@@ -83,8 +95,9 @@ export default function App() {
         - Format with clear headings and bullet points.
       `;
 
+      // Use gemini-3-pro-preview for complex technical coding and cryptographic reasoning tasks
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview',
         contents: query?.includes('blueprint') || showBlueprint ? blueprintPrompt : standardPrompt,
       });
 
@@ -111,6 +124,57 @@ export default function App() {
     if (userQuery.trim()) {
       generateStrategicAdvice(userQuery);
     }
+  };
+
+  const renderAnalysis = () => {
+    if (!analysis) return (
+      <div className="flex flex-col items-center justify-center py-24 opacity-20">
+        <MessageSquare className="w-16 h-16 mb-4" />
+        <p className="font-bold tracking-widest uppercase">System Standby</p>
+      </div>
+    );
+
+    let inCodeBlock = false;
+    return (
+      <div className="space-y-1 text-slate-300">
+        {analysis.split('\n').map((line, i) => {
+          if (line.startsWith('```')) {
+            inCodeBlock = !inCodeBlock;
+            return <div key={i} className="h-2" />;
+          }
+
+          if (inCodeBlock) {
+            return (
+              <div key={i} className="bg-slate-950/80 font-mono text-[11px] px-6 py-0.5 border-l-2 border-cyan-500/40 text-cyan-100/90 whitespace-pre-wrap leading-relaxed tracking-tight">
+                {line}
+              </div>
+            );
+          }
+
+          if (line.trim().startsWith('#')) {
+            const level = line.match(/^#+/)?.[0].length || 1;
+            // Using 'any' for dynamic component name to bypass JSX namespace and IntrinsicElements typing issues
+            const TextTag = `h${Math.min(level + 3, 6)}` as any;
+            return (
+              <TextTag key={i} className="text-cyan-400 font-bold mt-8 mb-4 border-b border-cyan-500/10 pb-2 flex items-center gap-2">
+                <Server className="w-4 h-4 text-cyan-500/60" /> {line.replace(/#/g, '').trim()}
+              </TextTag>
+            );
+          }
+
+          if (line.trim().startsWith('*') || line.trim().startsWith('-')) {
+            return (
+              <div key={i} className="flex items-start gap-2 ml-4 py-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-cyan-500 mt-1 flex-shrink-0" />
+                <span className="text-sm">{line.replace(/^[*|-]\s*/, '').trim()}</span>
+              </div>
+            );
+          }
+
+          return line.trim() ? <p key={i} className="text-sm leading-relaxed mb-4 text-slate-300/90">{line}</p> : <div key={i} className="h-2" />;
+        })}
+      </div>
+    );
   };
 
   return (
@@ -274,31 +338,7 @@ export default function App() {
               )}
               
               <div className="prose prose-invert max-w-none">
-                {analysis ? (
-                  <div className="space-y-4 text-slate-300">
-                    {analysis.split('\n').map((line, i) => {
-                      if (line.startsWith('```')) return null;
-                      if (line.trim().startsWith('#')) {
-                        return <h4 key={i} className="text-cyan-400 font-bold mt-8 mb-4 border-b border-cyan-500/20 pb-2 flex items-center gap-2">
-                          <Server className="w-4 h-4" /> {line.replace(/#/g, '').trim()}
-                        </h4>;
-                      }
-                      if (line.trim().startsWith('*')) {
-                        return <li key={i} className="ml-6 list-disc marker:text-cyan-500 mb-2">{line.replace(/\*/g, '').trim()}</li>;
-                      }
-                      // Basic code block highlighting logic
-                      if (line.includes('let ') || line.includes('fn ') || line.includes('pub ') || line.includes('docker')) {
-                         return <div key={i} className="bg-slate-950 font-mono text-xs p-1 px-4 border-l-2 border-cyan-500/50 text-cyan-100/90">{line}</div>;
-                      }
-                      return <p key={i} className="leading-relaxed mb-4">{line}</p>;
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-24 opacity-20">
-                    <MessageSquare className="w-16 h-16 mb-4" />
-                    <p className="font-bold tracking-widest uppercase">System Standby</p>
-                  </div>
-                )}
+                {renderAnalysis()}
               </div>
             </div>
 
@@ -307,7 +347,7 @@ export default function App() {
                 type="text" 
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
-                placeholder="Ask specific technical questions about the SNOVA batcher (e.g. 'How to handle re-orgs?')..."
+                placeholder="Ask technical questions (e.g. 'Optimizing MQ polynomial batching')..."
                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-6 py-4 text-sm focus:outline-none focus:border-cyan-500/50 transition-all font-mono"
               />
               <button 
