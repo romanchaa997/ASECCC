@@ -52,13 +52,18 @@ export const INITIAL_DATA: TrackData[] = [
     activePilots: 2,
     criticalRisks: ['SNOVA whipping attack vulnerabilities', 'Large key sizes'],
     milestones: [
-      { id: 'm5', title: 'SNOVA Rust Crate', date: '2025-07', status: 'completed', description: 'Implementation of NIST Round 2 multivariate sigs.' },
-      { id: 'm6', title: 'ML-KEM Integration', date: '2025-11', status: 'pending', description: 'Lattice-based key encapsulation mechanism.' }
+      { id: 'm5', title: 'SNOVA Rust Batcher', date: '2025-07', status: 'completed', description: 'Implementation of NIST Round 2 multivariate sigs with batching.' },
+      { id: 'm6', title: 'Hybrid Proving Node', date: '2025-11', status: 'in-progress', description: 'Rust-based off-chain signature aggregator.' }
     ],
     alternatives: [
-      { name: 'Dilithium (Lattice)', pros: ['NIST Primary choice', 'Balanced size'], cons: ['Complex implementation'], riskLevel: 'low', impact: 9 },
-      { name: 'Falcon (Lattice)', pros: ['Smallest signatures'], cons: ['Floating point requirements'], riskLevel: 'medium', impact: 8 },
-      { name: 'SPHINCS+ (Hash)', pros: ['Max robustness'], cons: ['Very large signatures'], riskLevel: 'low', impact: 7 }
+      { 
+        name: 'Hybrid SNOVA Batching', 
+        pros: ['Reduced Gas Cost', 'High Throughput', 'NIST PQ Resistant'], 
+        cons: ['Increased Latency', 'Trust in Batcher'], 
+        riskLevel: 'low', 
+        impact: 10 
+      },
+      { name: 'Pure On-chain SNOVA', pros: ['Decentralized', 'Trustless'], cons: ['Extreme Gas Cost', 'Size limits'], riskLevel: 'high', impact: 4 }
     ]
   }
 ];
