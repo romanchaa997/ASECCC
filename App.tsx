@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   ShieldAlert, 
   ChevronRight, 
@@ -21,7 +21,14 @@ import {
   CheckCircle2,
   FileText,
   TrendingUp,
-  Target
+  Target,
+  Download,
+  Filter,
+  X,
+  AlertTriangle,
+  Info,
+  ExternalLink,
+  Globe
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -32,10 +39,13 @@ import {
   Tooltip, 
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 import { GoogleGenAI } from "@google/genai";
-import { TrackData, TrackType } from './types';
+import { TrackData, TrackType, Notification, MilestoneFilter } from './types';
 import { INITIAL_DATA, TRACK_ICONS } from './constants';
 
 const REVENUE_DATA = [
@@ -47,80 +57,49 @@ const REVENUE_DATA = [
   { name: 'Dec', rev: 65000, target: 50000 },
 ];
 
+const COLORS = ['#22d3ee', '#818cf8', '#fbbf24', '#f87171'];
+
 export default function App() {
-  const [activeTrack, setActiveTrack] = useState<TrackData>(INITIAL_DATA[2]); // Default to Crypto
+  const [activeTrack, setActiveTrack] = useState<TrackData>(INITIAL_DATA[2]);
   const [analysis, setAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [userQuery, setUserQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'track' | 'blueprint' | 'report'>('track');
+  const [viewMode, setViewMode] = useState<'track' | 'blueprint' | 'report' | 'global'>('global');
+  const [milestoneFilter, setMilestoneFilter] = useState<MilestoneFilter>('all');
+  const [isExporting, setIsExporting] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([
+    { id: '1', title: 'Critical Vulnerability', message: 'SNOVA whipping attack vector detected in dev-branch.', type: 'critical', timestamp: '2m ago' },
+    { id: '2', title: 'Milestone Delayed', message: 'Cabinet.court.gov.ua API refactoring takes longer than expected.', type: 'warning', timestamp: '15m ago' },
+    { id: '3', title: 'New Pilot Secured', message: 'EU Legal Council joined the beta program.', type: 'success', timestamp: '1h ago' }
+  ]);
 
-  const generateStrategicAdvice = useCallback(async (query?: string, modeOverride?: 'track' | 'blueprint' | 'report') => {
+  const generateStrategicAdvice = useCallback(async (query?: string, modeOverride?: 'track' | 'blueprint' | 'report' | 'global') => {
     setIsAnalyzing(true);
     const mode = modeOverride || viewMode;
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
       let prompt = '';
       
-      if (mode === 'report') {
-        prompt = `
-          ACT AS: AuditorSEC Strategic Ecosystem Advisor.
-          OBJECTIVE: Generate a comprehensive Series A Readiness Report for Q1 2026.
-          
-          ECOSYSTEM DATA:
-          1. Legal AI Shield (Progress: 45%):
-             - Focus: Cabinet.court.gov.ua integration, debt collection automation.
-             - Key Tech: Self-RAG Agents, UKR Court API Bridge.
-          2. Audityzer.Web3 (Progress: 75%):
-             - Focus: On-chain audit registries, hybrid smart contract security.
-             - Key Tech: Polygon integration, Solidity Audit Engines.
-          3. Post-Quantum R&D (Progress: 30%):
-             - Focus: SNOVA Multivariate signatures, off-chain batch proving.
-             - Key Tech: Rust snova-pq crate, NIST Round 2 standard.
-
-          REPORT REQUIREMENTS:
-          - EXECUTIVE SUMMARY: Current ecosystem health and readiness for Series A.
-          - FEATURE MATRIX: Comparison of implemented vs. pending core features across all 3 tracks.
-          - Q1 2026 ROADMAP: Critical milestones for the next 4 months leading to deployment.
-          - RISK ASSESSMENT: Legal, Technical, and Market risks.
-          
-          Format as an investment-grade professional report with markdown. Use distinct sections and bold highlights.
-        `;
+      if (mode === 'global') {
+        prompt = "Analyze the AuditorSEC global ecosystem state across Legal, Security, and Crypto tracks. Identify cross-track synergies and the top 3 high-level bottlenecks for Series A readiness.";
+      } else if (mode === 'report') {
+        prompt = "Generate a comprehensive Series A Readiness Report for Q1 2026 covering all tracks, risk matrices, and resource allocation requirements.";
       } else if (mode === 'blueprint') {
-        prompt = `
-          ACT AS: Principal Post-Quantum Security Architect for AuditorSEC.
-          OBJECTIVE: Provide a detailed technical implementation blueprint for 'Hybrid Off-Chain Proving with Rust-SNOVA Batching'.
-          TRACK CONTEXT: ${activeTrack.type}.
-          
-          SNOVA CRATE SPECIFICATION:
-          1. Rust code for 'snova-pq' crate: KeyPair, Batcher, Signature.
-          2. Detailed Rust example: Batch signature generation and verification signatures.
-          3. Docker Compose for Proving Node.
-          4. Solidity 'verifyBatchedSnova' integration.
-          Format as technical documentation with syntax-highlighted markdown.
-        `;
+        prompt = `Generate technical blueprint for ${activeTrack.type} focusing on high-performance implementations.`;
       } else {
-        prompt = `
-          Context: You are the Lead Architect for AuditorSEC.
-          Current focus: ${activeTrack.type}.
-          Current Progress: ${activeTrack.progress}%.
-          Key Milestones: ${activeTrack.milestones.map(m => m.title).join(', ')}.
-          
-          Task: ${query || `Suggest 3 strategic alternatives to accelerate the completion of the ${activeTrack.type} track.`}
-          Format with headings and bullet points.
-        `;
+        prompt = `Suggest 3 strategic alternatives to accelerate ${activeTrack.type}.`;
       }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: prompt,
+        model: 'gemini-3-flash-preview',
+        contents: query || prompt,
       });
 
-      setAnalysis(response.text || 'Analysis unavailable at this time.');
+      setAnalysis(response.text || 'Analysis unavailable.');
     } catch (error) {
       console.error('Strategic Advice Error:', error);
-      setAnalysis('Critical failure in strategic engine. Please re-authenticate.');
+      setAnalysis('Critical failure in strategic engine.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -130,72 +109,50 @@ export default function App() {
     generateStrategicAdvice();
   }, [generateStrategicAdvice]);
 
-  const handleModeSwitch = (mode: 'track' | 'blueprint' | 'report') => {
-    setViewMode(mode);
-    generateStrategicAdvice(undefined, mode);
+  const filteredMilestones = useMemo(() => {
+    return activeTrack.milestones.filter(m => {
+      if (milestoneFilter === 'all') return true;
+      const [year, month] = m.date.split('-').map(Number);
+      if (milestoneFilter === 'Q3-2025') return year === 2025 && month >= 7 && month <= 9;
+      if (milestoneFilter === 'Q4-2025') return year === 2025 && month >= 10 && month <= 12;
+      if (milestoneFilter === '2026') return year === 2026;
+      return true;
+    });
+  }, [activeTrack, milestoneFilter]);
+
+  const handleExport = (format: 'PDF' | 'Excel') => {
+    setIsExporting(true);
+    setTimeout(() => {
+      setIsExporting(false);
+      alert(`Successfully exported ${viewMode} data to ${format}`);
+    }, 1500);
   };
 
-  const handleManualSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (userQuery.trim()) {
-      generateStrategicAdvice(userQuery);
-    }
+  const removeNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
   const renderAnalysis = () => {
-    if (!analysis) return (
-      <div className="flex flex-col items-center justify-center py-24 opacity-20">
-        <MessageSquare className="w-16 h-16 mb-4" />
-        <p className="font-bold tracking-widest uppercase">System Standby</p>
-      </div>
-    );
-
-    let inCodeBlock = false;
+    if (!analysis) return <div className="p-8 text-center opacity-20"><Loader2 className="animate-spin inline mr-2" /> Initializing Intelligence...</div>;
     return (
-      <div className="space-y-1 text-slate-300">
+      <div className="space-y-4 text-slate-300">
         {analysis.split('\n').map((line, i) => {
-          if (line.startsWith('```')) {
-            inCodeBlock = !inCodeBlock;
-            return <div key={i} className="h-2" />;
-          }
-
-          if (inCodeBlock) {
-            return (
-              <div key={i} className="bg-slate-950/80 font-mono text-[11px] px-6 py-0.5 border-l-2 border-cyan-500/40 text-cyan-100/90 whitespace-pre-wrap leading-relaxed tracking-tight">
-                {line}
-              </div>
-            );
-          }
-
           if (line.trim().startsWith('#')) {
-            const level = line.match(/^#+/)?.[0].length || 1;
-            const TextTag = `h${Math.min(level + 3, 6)}` as any;
-            return (
-              <TextTag key={i} className="text-cyan-400 font-bold mt-8 mb-4 border-b border-cyan-500/10 pb-2 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-cyan-500/60" /> {line.replace(/#/g, '').trim()}
-              </TextTag>
-            );
+             return <h4 key={i} className="text-cyan-400 font-bold mt-4 flex items-center gap-2 border-b border-cyan-500/10 pb-1">{line.replace(/#/g, '').trim()}</h4>;
           }
-
           if (line.trim().startsWith('*') || line.trim().startsWith('-')) {
-            return (
-              <div key={i} className="flex items-start gap-2 ml-4 py-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-cyan-500 mt-1 flex-shrink-0" />
-                <span className="text-sm">{line.replace(/^[*|-]\s*/, '').trim()}</span>
-              </div>
-            );
+             return <li key={i} className="ml-4 list-disc marker:text-cyan-500 text-sm">{line.replace(/^[*|-]\s*/, '').trim()}</li>;
           }
-
-          return line.trim() ? <p key={i} className="text-sm leading-relaxed mb-4 text-slate-300/90">{line}</p> : <div key={i} className="h-2" />;
+          return line.trim() ? <p key={i} className="text-sm leading-relaxed">{line}</p> : null;
         })}
       </div>
     );
   };
 
   return (
-    <div className="flex h-screen bg-[#020617] text-slate-100">
+    <div className="flex h-screen bg-[#020617] text-slate-100 overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800 flex flex-col glass">
+      <aside className="w-64 border-r border-slate-800 flex flex-col glass z-40">
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center neon-border">
@@ -203,21 +160,31 @@ export default function App() {
             </div>
             <div>
               <h1 className="font-bold text-lg tracking-tight">AuditorSEC</h1>
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest">Unified Command</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest">Command Center</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          <p className="px-4 py-2 text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Development Tracks</p>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <button
+            onClick={() => setViewMode('global')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              viewMode === 'global' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-slate-400 hover:bg-slate-800/50'
+            }`}
+          >
+            <Globe className="w-5 h-5" />
+            <span className="text-sm font-medium">Global Dashboard</span>
+          </button>
+
+          <p className="px-4 py-4 text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Active Tracks</p>
           {INITIAL_DATA.map((track) => (
             <button
               key={track.id}
-              onClick={() => { setActiveTrack(track); handleModeSwitch('track'); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
-                activeTrack.id === track.id && viewMode !== 'report'
+              onClick={() => { setActiveTrack(track); setViewMode('track'); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                activeTrack.id === track.id && viewMode === 'track'
                   ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' 
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'
+                  : 'text-slate-400 hover:bg-slate-800/50'
               }`}
             >
               {TRACK_ICONS[track.type]}
@@ -225,248 +192,402 @@ export default function App() {
             </button>
           ))}
           
-          <div className="pt-8 space-y-2">
-            <p className="px-4 py-2 text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Operations</p>
-            <button 
-              onClick={() => handleModeSwitch('report')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
-                viewMode === 'report' 
-                  ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.2)]' 
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'
-              }`}
-            >
-              <FileText className="w-5 h-5" />
-              <span className="text-sm font-medium">Readiness Report</span>
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 rounded-xl transition-all">
-              <Layers className="w-5 h-5" />
-              <span className="text-sm font-medium">Compliance Vault</span>
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 rounded-xl transition-all">
-              <Activity className="w-5 h-5" />
-              <span className="text-sm font-medium">System Health</span>
-            </button>
-          </div>
+          <p className="px-4 py-4 text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Operations</p>
+          <button 
+            onClick={() => setViewMode('report')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              viewMode === 'report' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30' : 'text-slate-400 hover:bg-slate-800/50'
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-sm font-medium">Series A Report</span>
+          </button>
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
-          <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-[10px] font-medium text-slate-400 uppercase">Series A Active Tracking</span>
-            </div>
-            <p className="text-[10px] text-slate-500 leading-relaxed">System observing multiple tracks for Q1 deployment.</p>
-          </div>
+        <div className="p-4 border-t border-slate-800 bg-slate-900/40">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="flex -space-x-2">
+                <div className="w-6 h-6 rounded-full bg-cyan-500 border border-slate-900" />
+                <div className="w-6 h-6 rounded-full bg-purple-500 border border-slate-900" />
+                <div className="w-6 h-6 rounded-full bg-slate-700 border border-slate-900 flex items-center justify-center text-[8px]">+4</div>
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">Collaborators Online</span>
+           </div>
+           <button className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-[10px] font-bold rounded-lg border border-slate-700 uppercase tracking-wider transition-all">
+             Invite Architect
+           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-grid-slate-900/[0.04]">
-        <header className="sticky top-0 z-30 glass border-b border-slate-800 p-6 flex justify-between items-center">
+      {/* Main Container */}
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-[#020617]">
+        {/* Top Header */}
+        <header className="glass border-b border-slate-800 p-6 flex justify-between items-center z-30">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold">
-              {viewMode === 'report' ? 'Series A Ecosystem Readiness' : `${activeTrack.type} Overview`}
+            <h2 className="text-xl font-bold flex items-center gap-3">
+              {viewMode === 'global' ? 'Ecosystem Readiness' : viewMode === 'report' ? 'Investment Report' : `${activeTrack.type}`}
+              {viewMode === 'track' && <span className="text-xs font-normal text-slate-500">Track ID: {activeTrack.id}</span>}
             </h2>
-            <div className={`px-3 py-1 rounded-full text-xs border ${
-              viewMode === 'report' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-            }`}>
-              {viewMode === 'report' ? 'Global Status' : activeTrack.revenue}
-            </div>
           </div>
+          
           <div className="flex items-center gap-4">
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-hover:text-cyan-400 transition-colors" />
-              <input 
-                type="text" 
-                placeholder="Query implementation..."
-                className="bg-slate-900 border border-slate-700 rounded-full py-2 pl-10 pr-4 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
-              />
-            </div>
-            <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors">
-              <Bell className="w-5 h-5" />
-            </button>
-            <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
+             <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800">
+                <button 
+                  onClick={() => handleExport('PDF')}
+                  disabled={isExporting}
+                  className="px-3 py-1.5 text-[10px] font-bold hover:bg-slate-800 rounded-lg flex items-center gap-2 transition-all"
+                >
+                  {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                  PDF
+                </button>
+                <button 
+                  onClick={() => handleExport('Excel')}
+                  disabled={isExporting}
+                  className="px-3 py-1.5 text-[10px] font-bold hover:bg-slate-800 rounded-lg flex items-center gap-2 transition-all"
+                >
+                  <FileText className="w-3 h-3" />
+                  XLS
+                </button>
+             </div>
+             <div className="h-8 w-px bg-slate-800" />
+             <div className="relative">
+                <button className="p-2 bg-slate-900 rounded-xl border border-slate-800 text-slate-400 hover:text-cyan-400 transition-all relative">
+                  <Bell className="w-5 h-5" />
+                  {notifications.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900" />}
+                </button>
+             </div>
+             <button className="p-2 bg-slate-900 rounded-xl border border-slate-800 text-slate-400 hover:text-slate-100 transition-all">
+               <Settings className="w-5 h-5" />
+             </button>
           </div>
         </header>
 
-        <div className="p-8 space-y-8">
-          {/* Dashboard Summary Cards - Only show in track/blueprint mode */}
-          {viewMode !== 'report' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="glass p-6 rounded-3xl space-y-4 border-t-4 border-t-cyan-500">
-                <div className="flex justify-between items-center">
-                  <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Progress</p>
-                  <div className="p-2 bg-cyan-500/10 rounded-lg"><Cpu className="w-4 h-4 text-cyan-400" /></div>
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 pb-20">
+          
+          {/* View: Global Dashboard */}
+          {viewMode === 'global' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="glass p-6 rounded-3xl border-t-4 border-t-cyan-500 space-y-2">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Total Ecosystem Progress</p>
+                  <p className="text-4xl font-bold neon-text-cyan">58.2%</p>
+                  <div className="flex items-center gap-2 text-[10px] text-green-400">
+                    <TrendingUp className="w-3 h-3" /> +4.2% since last week
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold">{activeTrack.progress}% Complete</h3>
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                   <div className="bg-cyan-500 h-full transition-all duration-1000" style={{ width: `${activeTrack.progress}%` }} />
+                <div className="glass p-6 rounded-3xl border-t-4 border-t-purple-500 space-y-2">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Live Project Pilots</p>
+                  <p className="text-4xl font-bold text-purple-400">19</p>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                    <Globe className="w-3 h-3" /> Across 8 Regions
+                  </div>
                 </div>
-              </div>
-              
-              <div className="glass p-6 rounded-3xl space-y-4 border-t-4 border-t-yellow-500">
-                <div className="flex justify-between items-center">
-                  <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Latency Budget</p>
-                  <div className="p-2 bg-yellow-500/10 rounded-lg"><Activity className="w-4 h-4 text-yellow-400" /></div>
+                <div className="glass p-6 rounded-3xl border-t-4 border-t-yellow-500 space-y-2">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Active Risks</p>
+                  <p className="text-4xl font-bold text-yellow-400">07</p>
+                  <div className="flex items-center gap-2 text-[10px] text-red-400">
+                    <AlertTriangle className="w-3 h-3" /> 2 Critical Path Blocks
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold">Sub-150ms Target</h3>
-                <p className="text-xs text-slate-400">Optimization active for off-chain proving nodes.</p>
+                <div className="glass p-6 rounded-3xl border-t-4 border-t-green-500 space-y-2">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Ecosystem Revenue (Est.)</p>
+                  <p className="text-4xl font-bold text-green-400">$60K</p>
+                  <div className="flex items-center gap-2 text-[10px] text-green-400 font-bold uppercase">
+                    MRR Target: $100K
+                  </div>
+                </div>
               </div>
 
-              <div className="glass p-6 rounded-3xl space-y-4 border-t-4 border-t-green-500">
-                <div className="flex justify-between items-center">
-                  <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Efficiency</p>
-                  <div className="p-2 bg-green-500/10 rounded-lg"><Zap className="w-4 h-4 text-green-400" /></div>
-                </div>
-                <h3 className="text-lg font-bold">Tier 1 Optimization</h3>
-                <p className="text-xs text-slate-400">NIST Round 2 compliance reached in v2.1-stable.</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                 <div className="glass p-8 rounded-3xl space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-bold flex items-center gap-2"><BarChart3 className="text-cyan-400" /> Revenue Growth Velocity</h3>
+                      <button className="text-[10px] text-slate-500 hover:text-slate-300">DETAILS <ChevronRight className="w-3 h-3 inline" /></button>
+                    </div>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={REVENUE_DATA}>
+                          <defs>
+                            <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.4}/>
+                              <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                          <XAxis dataKey="name" stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} />
+                          <YAxis stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} />
+                          <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }} />
+                          <Area type="monotone" dataKey="rev" stroke="#22d3ee" fillOpacity={1} fill="url(#colorGlobal)" strokeWidth={3} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                 </div>
+
+                 <div className="glass p-8 rounded-3xl space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-bold flex items-center gap-2"><Target className="text-purple-400" /> Resource Allocation</h3>
+                      <button className="text-[10px] text-slate-500 hover:text-slate-300">RE-BALANCE <ChevronRight className="w-3 h-3 inline" /></button>
+                    </div>
+                    <div className="h-64 flex items-center justify-center">
+                       <ResponsiveContainer width="100%" height="100%">
+                         <PieChart>
+                           <Pie
+                             data={[
+                               { name: 'Legal AI', value: 45 },
+                               { name: 'Web3 Security', value: 25 },
+                               { name: 'PQ Crypto', value: 30 },
+                             ]}
+                             cx="50%"
+                             cy="50%"
+                             innerRadius={60}
+                             outerRadius={100}
+                             paddingAngle={8}
+                             dataKey="value"
+                           >
+                             {INITIAL_DATA.map((entry, index) => (
+                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                             ))}
+                           </Pie>
+                           <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }} />
+                         </PieChart>
+                       </ResponsiveContainer>
+                       <div className="absolute flex flex-col items-center">
+                          <span className="text-[10px] text-slate-500 uppercase">Series A</span>
+                          <span className="text-xl font-bold">READY</span>
+                       </div>
+                    </div>
+                 </div>
               </div>
             </div>
           )}
 
-          {/* Strategic Advisor / Report Section */}
-          <div className={`glass rounded-3xl p-8 space-y-6 ${viewMode === 'report' ? 'border-purple-500/30 bg-purple-500/[0.02]' : ''}`}>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center neon-border ${
-                  viewMode === 'report' ? 'bg-purple-500/20 border-purple-500/40' : 'bg-cyan-500/20'
-                }`}>
-                  {viewMode === 'report' ? <FileText className="text-purple-400 w-7 h-7" /> : (viewMode === 'blueprint' ? <Code className="text-cyan-400 w-7 h-7" /> : <BrainCircuit className="text-cyan-400 w-7 h-7" />)}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">
-                    {viewMode === 'report' ? 'Deployment Status Report' : (viewMode === 'blueprint' ? 'Technical Blueprint' : 'Strategic Advisor')}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {viewMode === 'report' ? 'Consolidated Series A Readiness Audit' : 'AI-Driven Multi-Track Intelligence'}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                {viewMode !== 'report' && (
-                  <button 
-                    onClick={() => handleModeSwitch(viewMode === 'blueprint' ? 'track' : 'blueprint')}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all border ${
-                      viewMode === 'blueprint' 
-                        ? 'bg-slate-800 text-cyan-400 border-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.2)]' 
-                        : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-100 hover:border-slate-500'
-                    }`}
-                  >
-                    <Terminal className="w-5 h-5" />
-                    {viewMode === 'blueprint' ? 'VIEW STRATEGY' : 'GENERATE BLUEPRINT'}
-                  </button>
-                )}
-                
-                <button 
-                  onClick={() => generateStrategicAdvice()}
-                  disabled={isAnalyzing}
-                  className={`flex items-center gap-2 px-6 py-2.5 font-bold rounded-xl transition-all shadow-xl disabled:opacity-50 ${
-                    viewMode === 'report' ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-500/20' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-900 shadow-cyan-500/20'
-                  }`}
-                >
-                  {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
-                  {viewMode === 'report' ? 'RE-SCAN ECOSYSTEM' : 'REFRESH ENGINE'}
-                </button>
-              </div>
-            </div>
+          {/* View: Track Mode */}
+          {viewMode === 'track' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+               {/* Milestone Filters */}
+               <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase tracking-widest">
+                      <Filter className="w-3 h-3" /> Filter Milestones
+                    </span>
+                    <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 gap-1">
+                      {(['all', 'Q3-2025', 'Q4-2025', '2026'] as MilestoneFilter[]).map(f => (
+                        <button 
+                          key={f}
+                          onClick={() => setMilestoneFilter(f)}
+                          className={`px-4 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                            milestoneFilter === f ? 'bg-cyan-500 text-slate-900' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+                          }`}
+                        >
+                          {f === 'all' ? 'All Time' : f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                    <span className="text-xs font-bold text-yellow-500">2 OVERDUE</span>
+                  </div>
+               </div>
 
-            <div className={`min-h-[450px] rounded-2xl p-8 border relative overflow-hidden ${
-              viewMode === 'report' ? 'bg-purple-950/20 border-purple-500/20 shadow-inner' : 'bg-[#0f172a]/80 border-slate-800'
-            }`}>
-              {isAnalyzing && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-sm z-10">
-                  <div className={`w-12 h-12 border-4 rounded-full animate-spin mb-4 ${
-                    viewMode === 'report' ? 'border-purple-500/20 border-t-purple-500' : 'border-cyan-500/20 border-t-cyan-500'
-                  }`} />
-                  <p className={`font-medium animate-pulse tracking-widest text-xs uppercase ${
-                    viewMode === 'report' ? 'text-purple-400' : 'text-cyan-400'
-                  }`}>
-                    {viewMode === 'report' ? 'Scanning Global Readiness Metrics...' : 'Computing Implementation Vectors...'}
-                  </p>
-                </div>
-              )}
-              
-              <div className="prose prose-invert max-w-none">
-                {renderAnalysis()}
-              </div>
-            </div>
+               <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                  {/* Milestone List */}
+                  <div className="xl:col-span-2 space-y-6">
+                    <div className="grid gap-4">
+                      {filteredMilestones.map(m => (
+                        <div key={m.id} className="glass p-6 rounded-3xl border border-slate-800 hover:border-cyan-500/40 transition-all group relative overflow-hidden">
+                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-100 transition-opacity">
+                            <ExternalLink className="w-4 h-4 text-cyan-400 cursor-pointer" />
+                          </div>
+                          <div className="flex items-start gap-4">
+                            <div className={`mt-1 p-2 rounded-lg flex-shrink-0 ${
+                              m.status === 'completed' ? 'bg-green-500/10 text-green-400' :
+                              m.status === 'in-progress' ? 'bg-cyan-500/10 text-cyan-400 animate-pulse' :
+                              m.status === 'delayed' ? 'bg-red-500/10 text-red-400' : 'bg-slate-800 text-slate-400'
+                            }`}>
+                              {m.status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> : <Activity className="w-5 h-5" />}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex justify-between items-center mb-1">
+                                <h4 className="font-bold text-slate-100">{m.title}</h4>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase">{m.date}</span>
+                              </div>
+                              <p className="text-xs text-slate-400 mb-3">{m.description}</p>
+                              <div className="flex items-center gap-4">
+                                <div className="flex -space-x-1.5">
+                                   <div className="w-5 h-5 rounded-full bg-cyan-500 border border-slate-900" />
+                                   <div className="w-5 h-5 rounded-full bg-slate-700 border border-slate-900" />
+                                </div>
+                                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Team Assigned</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredMilestones.length === 0 && (
+                        <div className="p-12 text-center opacity-30 border-2 border-dashed border-slate-800 rounded-3xl">
+                          <Info className="w-10 h-10 mx-auto mb-2" />
+                          <p className="text-sm font-bold">No milestones found for this period</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-            {viewMode !== 'report' && (
-              <form onSubmit={handleManualSearch} className="flex gap-3">
+                  {/* Strategic Context Panel */}
+                  <div className="space-y-6">
+                    <div className="glass p-8 rounded-3xl space-y-6 border border-slate-800 shadow-2xl">
+                       <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center neon-border">
+                            <BrainCircuit className="text-cyan-400 w-6 h-6" />
+                          </div>
+                          <h3 className="text-lg font-bold">Track Intelligence</h3>
+                       </div>
+                       <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800 relative min-h-[300px]">
+                          {isAnalyzing && (
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-2xl">
+                              <Loader2 className="w-8 h-8 text-cyan-400 animate-spin mb-2" />
+                              <p className="text-[10px] text-cyan-400 font-bold uppercase animate-pulse">Running Neural Inference...</p>
+                            </div>
+                          )}
+                          {renderAnalysis()}
+                       </div>
+                       <button 
+                        onClick={() => generateStrategicAdvice()}
+                        className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.2)]"
+                       >
+                         REFRESH ADVICE
+                       </button>
+                    </div>
+                  </div>
+               </div>
+            </div>
+          )}
+
+          {/* View: Readiness Report */}
+          {viewMode === 'report' && (
+            <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in zoom-in-95 duration-700">
+               <div className="text-center space-y-4">
+                  <p className="text-[10px] text-purple-400 font-bold uppercase tracking-[0.3em]">Confidential Ecosystem Analysis</p>
+                  <h1 className="text-5xl font-extrabold tracking-tight">Series A Readiness Report</h1>
+                  <p className="text-slate-500 max-w-lg mx-auto">Consolidated technical audit, legal compliance mapping, and market traction analysis for the Q1 2026 deployment phase.</p>
+               </div>
+               
+               <div className="glass p-12 rounded-[3rem] border border-purple-500/20 shadow-2xl shadow-purple-500/5">
+                 {isAnalyzing ? (
+                   <div className="py-24 text-center space-y-6">
+                      <div className="w-20 h-20 border-4 border-purple-500/10 border-t-purple-500 rounded-full animate-spin mx-auto" />
+                      <p className="text-purple-400 font-bold uppercase tracking-widest animate-pulse">Assembling Investment-Grade Data...</p>
+                   </div>
+                 ) : renderAnalysis()}
+               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Global Chat / Query Bar */}
+        <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#020617] via-[#020617]/90 to-transparent z-40">
+           <form onSubmit={(e) => { e.preventDefault(); generateStrategicAdvice(userQuery); }} className="max-w-4xl mx-auto flex gap-4">
+              <div className="flex-1 relative group">
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-hover:text-cyan-400 transition-colors" />
                 <input 
                   type="text" 
                   value={userQuery}
                   onChange={(e) => setUserQuery(e.target.value)}
-                  placeholder="Ask technical questions (e.g. 'Optimizing MQ polynomial batching')..."
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-6 py-4 text-sm focus:outline-none focus:border-cyan-500/50 transition-all font-mono"
+                  placeholder="Ask the system architecture (e.g., 'Compare current burn rate with Series A targets')..."
+                  className="w-full bg-slate-900/80 backdrop-blur-xl border border-slate-700 hover:border-slate-500 focus:border-cyan-500/50 py-4 pl-14 pr-6 rounded-2xl text-sm focus:outline-none transition-all shadow-2xl"
                 />
-                <button 
-                  type="submit"
-                  disabled={isAnalyzing}
-                  className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl transition-all border border-slate-700 font-bold"
-                >
-                  EXECUTE
-                </button>
-              </form>
-            )}
-          </div>
+              </div>
+              <button className="px-8 bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold rounded-2xl border border-slate-700 transition-all flex items-center gap-2">
+                <Zap className="w-5 h-5 text-cyan-400" />
+                QUERY
+              </button>
+           </form>
         </div>
       </main>
 
-      {/* Deployment / Infrastructure Monitor */}
-      <aside className="w-80 border-l border-slate-800 glass hidden 2xl:flex flex-col overflow-hidden">
+      {/* Right Intelligence Panel (Notifications & Logs) */}
+      <aside className="w-80 border-l border-slate-800 glass hidden 2xl:flex flex-col z-40">
         <div className="p-6 border-b border-slate-800 bg-slate-900/40">
-          <h3 className="font-bold flex items-center gap-2 uppercase tracking-widest text-[10px] text-cyan-400">
-            <Server className="w-3 h-3" />
-            Infrastructure Status
-          </h3>
+           <h3 className="font-bold flex items-center justify-between">
+             <span className="flex items-center gap-2 uppercase tracking-widest text-[10px] text-cyan-400">
+               <Activity className="w-3 h-3" /> Notifications Center
+             </span>
+             {notifications.length > 0 && (
+               <span className="bg-red-500 text-[8px] px-1.5 py-0.5 rounded-full text-white">{notifications.length}</span>
+             )}
+           </h3>
         </div>
-        <div className="flex-1 p-6 space-y-8 overflow-y-auto">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active Services</span>
-              <span className="text-[10px] text-green-500 px-2 py-0.5 bg-green-500/10 rounded border border-green-500/20">HEALTHY</span>
-            </div>
-            <div className="space-y-3">
-              {[
-                { name: 'SNOVA Batch Engine', status: 'Active', load: '18%' },
-                { name: 'Legal AI RAG Node', status: 'Standby', load: '4%' },
-                { name: 'Audityzer.Web3 API', status: 'Active', load: '62%' },
-                { name: 'Polygon RPC Node', status: 'Active', load: '31%' },
-              ].map((svc, i) => (
-                <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 hover:border-cyan-500/30 transition-all">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-200">{svc.name}</span>
-                    <span className="text-[9px] text-slate-500 uppercase tracking-widest">{svc.status}</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                    <div className="bg-cyan-500 h-full" style={{ width: svc.load }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="p-4 bg-cyan-500/5 rounded-2xl border border-cyan-500/10 space-y-4">
-             <div className="flex items-center gap-2">
-               <Target className="w-3 h-3 text-cyan-400" />
-               <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest">Global Readiness Score</p>
+        <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+           {notifications.length > 0 ? (
+             <div className="space-y-4">
+               {notifications.map(n => (
+                 <div key={n.id} className={`p-4 rounded-2xl border transition-all hover:translate-x-1 relative group ${
+                   n.type === 'critical' ? 'bg-red-500/5 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)]' :
+                   n.type === 'warning' ? 'bg-yellow-500/5 border-yellow-500/20' :
+                   n.type === 'success' ? 'bg-green-500/5 border-green-500/20' : 'bg-slate-800/30 border-slate-700'
+                 }`}>
+                   <button 
+                    onClick={() => removeNotification(n.id)}
+                    className="absolute top-2 right-2 p-1 text-slate-500 hover:text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                   >
+                     <X className="w-3 h-3" />
+                   </button>
+                   <div className="flex items-center gap-2 mb-2">
+                     {n.type === 'critical' && <AlertTriangle className="w-3.5 h-3.5 text-red-400" />}
+                     {n.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />}
+                     {n.type === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />}
+                     {n.type === 'info' && <Info className="w-3.5 h-3.5 text-cyan-400" />}
+                     <span className="text-[10px] font-bold uppercase text-slate-300">{n.title}</span>
+                   </div>
+                   <p className="text-[11px] text-slate-400 leading-relaxed mb-2">{n.message}</p>
+                   <span className="text-[9px] text-slate-600 font-bold">{n.timestamp}</span>
+                 </div>
+               ))}
              </div>
-             <div className="flex items-end gap-2">
-               <span className="text-3xl font-bold tracking-tighter">72.4</span>
-               <span className="text-xs text-slate-500 mb-1">/ 100</span>
+           ) : (
+             <div className="flex flex-col items-center justify-center py-20 text-slate-700">
+                <CheckCircle2 className="w-10 h-10 mb-2 opacity-20" />
+                <p className="text-xs font-bold uppercase tracking-widest">No New Alerts</p>
              </div>
-             <div className="pt-2">
-               <button 
-                onClick={() => handleModeSwitch('report')}
-                className="w-full py-2.5 bg-cyan-500/20 hover:bg-cyan-500 text-cyan-400 hover:text-slate-900 text-[10px] font-bold rounded-xl border border-cyan-500/30 transition-all uppercase tracking-widest">
-                 Open Readiness Console
-               </button>
-             </div>
-          </div>
+           )}
+
+           <div className="pt-6 border-t border-slate-800 space-y-4">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Infrastructure Logs</span>
+              <div className="space-y-3 font-mono text-[9px]">
+                 <div className="flex gap-2 text-slate-500">
+                    <span className="text-cyan-600">[14:22:01]</span>
+                    <span>SNOVA-PQ/Batcher active (shards: 4)</span>
+                 </div>
+                 <div className="flex gap-2 text-slate-500">
+                    <span className="text-cyan-600">[14:21:45]</span>
+                    <span>Court-API-UKR ping: 42ms (stable)</span>
+                 </div>
+                 <div className="flex gap-2 text-yellow-500">
+                    <span className="text-yellow-600">[14:19:33]</span>
+                    <span>Solidity/Audit memory leak detected (non-critical)</span>
+                 </div>
+                 <div className="flex gap-2 text-slate-500">
+                    <span className="text-cyan-600">[14:15:10]</span>
+                    <span>Series-A Readiness Score recalculated: 58.2</span>
+                 </div>
+              </div>
+           </div>
+        </div>
+        
+        <div className="p-6 border-t border-slate-800">
+           <div className="bg-cyan-500/5 rounded-2xl p-4 border border-cyan-500/10 space-y-3">
+              <div className="flex items-center justify-between">
+                 <span className="text-[10px] text-cyan-400 font-bold uppercase">System Uptime</span>
+                 <span className="text-[10px] text-cyan-400">99.98%</span>
+              </div>
+              <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden flex gap-0.5">
+                 {Array.from({length: 20}).map((_, i) => (
+                   <div key={i} className={`flex-1 h-full ${i === 12 ? 'bg-yellow-500' : 'bg-cyan-500'}`} />
+                 ))}
+              </div>
+           </div>
         </div>
       </aside>
     </div>

@@ -10,7 +10,7 @@ export enum TrackType {
 export interface Milestone {
   id: string;
   title: string;
-  date: string;
+  date: string; // YYYY-MM format
   status: 'completed' | 'in-progress' | 'pending' | 'delayed';
   description: string;
 }
@@ -33,3 +33,13 @@ export interface TrackData {
   alternatives: Alternative[];
   criticalRisks: string[];
 }
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'critical' | 'warning' | 'info' | 'success';
+  timestamp: string;
+}
+
+export type MilestoneFilter = 'all' | 'Q3-2025' | 'Q4-2025' | '2026';
