@@ -28,7 +28,8 @@ import {
   AlertTriangle,
   Info,
   ExternalLink,
-  Globe
+  Globe,
+  Clock
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -401,25 +402,56 @@ export default function App() {
                             <ExternalLink className="w-4 h-4 text-cyan-400 cursor-pointer" />
                           </div>
                           <div className="flex items-start gap-4">
-                            <div className={`mt-1 p-2 rounded-lg flex-shrink-0 ${
+                            <div className={`mt-1 p-2 rounded-lg flex-shrink-0 transition-transform group-hover:scale-110 ${
                               m.status === 'completed' ? 'bg-green-500/10 text-green-400' :
-                              m.status === 'in-progress' ? 'bg-cyan-500/10 text-cyan-400 animate-pulse' :
+                              m.status === 'in-progress' ? 'bg-cyan-500/10 text-cyan-400' :
                               m.status === 'delayed' ? 'bg-red-500/10 text-red-400' : 'bg-slate-800 text-slate-400'
                             }`}>
-                              {m.status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> : <Activity className="w-5 h-5" />}
+                              {m.status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> : 
+                               m.status === 'in-progress' ? <Clock className="w-5 h-5 animate-pulse" /> : 
+                               m.status === 'delayed' ? <AlertTriangle className="w-5 h-5" /> :
+                               <Activity className="w-5 h-5" />}
                             </div>
                             <div className="flex-1">
                               <div className="flex justify-between items-center mb-1">
-                                <h4 className="font-bold text-slate-100">{m.title}</h4>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-bold text-slate-100">{m.title}</h4>
+                                  {m.status === 'in-progress' && (
+                                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 text-[8px] font-bold border border-cyan-500/30 uppercase tracking-tighter flex items-center gap-1">
+                                      <div className="w-1 h-1 rounded-full bg-cyan-400 animate-ping" />
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-[10px] font-bold text-slate-500 uppercase">{m.date}</span>
                               </div>
-                              <p className="text-xs text-slate-400 mb-3">{m.description}</p>
+                              <p className="text-xs text-slate-400 mb-4">{m.description}</p>
+                              
+                              {/* New Progress Indicators */}
+                              {m.status === 'in-progress' && (
+                                <div className="mb-4 space-y-2">
+                                  <div className="flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                    <span>Work Stream Progress</span>
+                                    <span className="text-cyan-400">65%</span>
+                                  </div>
+                                  <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                                    <div 
+                                      className="bg-cyan-500 h-full relative overflow-hidden transition-all duration-1000 ease-out" 
+                                      style={{ width: '65%' }}
+                                    >
+                                      {/* Glimmer effect for active bars */}
+                                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-20 h-full animate-[shimmer_2s_infinite] -translate-x-full" />
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="flex items-center gap-4">
                                 <div className="flex -space-x-1.5">
-                                   <div className="w-5 h-5 rounded-full bg-cyan-500 border border-slate-900" />
+                                   <div className="w-5 h-5 rounded-full bg-cyan-500 border border-slate-900 shadow-[0_0_5px_rgba(34,211,238,0.5)]" />
                                    <div className="w-5 h-5 rounded-full bg-slate-700 border border-slate-900" />
                                 </div>
-                                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Team Assigned</span>
+                                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Architect Assigned</span>
                               </div>
                             </div>
                           </div>
